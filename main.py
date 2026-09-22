@@ -3,6 +3,7 @@ import logging
 import sqlite3
 import os
 import re
+from aiohttp import web  # Render'da portni eshitib turish uchun
 from aiogram import Bot, Dispatcher, F, Router
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
@@ -17,9 +18,8 @@ from aiogram.types import (
 )
 
 # --- XAVFSIZ SOZLAMALAR (Environment Variables) ---
-# Server/Hosting platformasidagi Environment Variables bo'limidan olinadi.
 BOT_TOKEN = os.getenv("BOT_TOKEN")
-ADMIN_ID_RAW = os.getenv("ADMIN_ID", "8371392099")  # Odatiy qiymat sifatida ko'rsatilgan
+ADMIN_ID_RAW = os.getenv("ADMIN_ID", "8371392099")
 
 if not BOT_TOKEN:
     raise ValueError("⚠️ BOT_TOKEN topilmadi! Iltimos, atrof-muhit o'zgaruvchisini (Environment Variable) sozlang.")
@@ -322,7 +322,6 @@ async def process_txt_file(message: Message, state: FSMContext):
 
 @router.message(F.text.in_([
     "8-sinf O'zbekiston tarixi", 
-    "9-sinf O me'moriy tarixi", 
     "9-sinf O'zbekiston tarixi", 
     "10-sinf O'zbekiston tarixi", 
     "11-sinf O'zbekiston tarixi"
@@ -411,8 +410,26 @@ async def start_topic_quiz(message: Message, state: FSMContext):
     await message.answer(f"🚀 '{topic}' mavzusi bo'yicha test boshlandi! Omad!", reply_markup=ReplyKeyboardRemove())
     await send_question(message, questions[0], 1, len(questions))
 
+# --- RENDER PORTINI ESHITISH UCHUN DUMMY WEB SERVER ---
+async def handle_ping(request):
+    return web.Response(text="Bot runs live successfully!")
+
+async def start_web_server():
+    app = web.Application()
+    app.router.add_get("/", handle_ping)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    
+    # Render avtomatik beradigan PORT o'zgaruvchisini olamiz (odatiy 8080)
+    port = int(os.getenv("PORT", 8080))
+    site = web.TCPSite(runner, "0.0.0.0", port)
+    await site.start()
+
 # --- ISHGA TUSHIRISH ---
 async def main():
+    # Render uchun web serverni orqa fonda yurgizamiz
+    await start_web_server()
+    # Polling orqali botni ishga tushiramiz
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
